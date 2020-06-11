@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
@@ -8,59 +7,96 @@ namespace MouseCursorMovement
 {
     class Program
     {
-        [DllImport("user32.dll")]
-        private static extern bool GetCursorPos(out Point lpPoint);
-        [DllImport("user32.dll", EntryPoint = "SetCursorPos")]
-        private static extern bool SetCursorPos(Point lpPoint);
-
         static void Main(string[] args)
         {
             /// With Timer
-            // var timer = new Timer();
-            //timer.Interval = (int)(TimeSpan.TicksPerMinute * .10 / TimeSpan.TicksPerMillisecond);//4 minutes
-            //timer.Elapsed += (sender, args) =>
-            //{
-            //    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            //    {
-            //        if (GetCursorPos(out Point mouse))
-            //        {
-            //            mouse.X = (mouse.X < 101) ? 300 : 100;
-            //            mouse.Y = (mouse.Y < 101) ? 300 : 100;
-            //            SetCursorPos(mouse);
-            //            Console.WriteLine($"Mouse X:{mouse.X} Y:{mouse.Y}");
-            //        }
-            //    }
-            //    else {// How to do on Linux and OSX? }
-            //};
-            //timer.Start();
-            //while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape))
-            //{
-            //    System.Threading.Thread.Sleep(100);
-            //}
+            /* var timer = new Timer();
+            timer.Interval = (int)(TimeSpan.TicksPerMinute * .10 / TimeSpan.TicksPerMillisecond);//4 minutes
+            timer.Elapsed += (sender, args) =>
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    if (GetCursorPos(out Point mouse))
+                    {
+                        mouse.X = (mouse.X < 101) ? 300 : 100;
+                        mouse.Y = (mouse.Y < 101) ? 300 : 100;
+                        SetCursorPos(mouse);
+                        Console.WriteLine($"Mouse X:{mouse.X} Y:{mouse.Y}");
+                    }
+                }
+                //else {// Linux and OSX? }
+            };
+            timer.Start();
+            while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape))
+            {
+                System.Threading.Thread.Sleep(100);
+            }*/
+
+            ///With Thread
             var active = true;
+            var keyCode = ConsoleKey.LeftArrow;
+            var keyCodeAlt = ConsoleKey.RightArrow;
+            var alt = true;
+
             Console.WriteLine("Press escape to stop...");
             var task = Task.Run(()=> {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                if (WinUser32Dll.IsWindows())
                 {
                     while (active)
                     {
-                        if (GetCursorPos(out Point mouse))
+                        var consoleText = "";
+                        try        
                         {
-                            mouse.X = (mouse.X < 101) ? 300 : 100;
-                            //mouse.Y = (mouse.Y < 101) ? 300 : 100;
-                            SetCursorPos(mouse);
-                            Console.WriteLine($"mouse x:{mouse.X} time:{DateTime.Now.ToLongTimeString()}");
+                            if (WinUser32Dll.GetCursorPos(out Point mouse))
+                            {
+                                if (mouse.X > 1000)
+                                    alt = true;
+                                else if (mouse.X <= 1)
+                                    alt = false;
+
+                                mouse.X += (alt) switch
+                                {
+                                    true => -1,
+                                    _ => 1
+                                };
+                                
+                                //mouse.Y = (mouse.Y < 101) ? 300 : 100;
+                                WinUser32Dll.SetCursorPos(mouse);
+                                consoleText += $" 'mouse x:{mouse.X}'";
+                            }
                         }
-                        for (var i = 0; i < 12 && active; i++)
+                        catch {
+                            consoleText += $" 'mouse x:ERROR'";
+                        }
+                        try
                         {
-                            System.Threading.Thread.Sleep(500);
+                            WinUser32Dll.SendKey((int)(alt ? keyCode : keyCodeAlt));
+                            consoleText += $" 'key :{(int)(alt ? keyCode : keyCodeAlt)}'";
+                        }
+                        catch
+                        {
+                            consoleText += " 'key :ERROR'";
+                        }
+
+                        Console.WriteLine($"{consoleText} 'time:{DateTime.Now.ToLongTimeString()}'");
+
+                        for ( var i = 0; i < 1  && active; i++)
+                        {
+                            System.Threading.Thread.Sleep(1000); //12 Seconds (1 second in a bucle
                         }
                     }
                 }
+                active = false;//
             });
-            Console.ReadKey();
-            active = false;
-            task.Wait();
+             var key = Console.ReadKey(true); 
+            while (key.Key == keyCode || key.Key == keyCodeAlt)
+            {
+                 key = Console.ReadKey(true);
+              }
+            if (active) {
+                active = false;
+                task.Wait();
+            }
         }
     }
 }
